@@ -1,0 +1,204 @@
+C51 COMPILER V8.02   MAIN                                                                  10/29/2025 22:05:14 PAGE 1   
+
+
+C51 COMPILER V8.02, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN main.OBJ
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE main.c BROWSE DEBUG OBJECTEXTEND
+
+line level    source
+
+   1          #include <absacc.h>
+   2          #include <ctype.h>
+   3          #include <reg51.h>
+   4          
+   5          void DispClear();
+   6          void DispChar(unsigned char x, unsigned char c, bit dp);
+   7          void DispStr(unsigned char x, unsigned char idata* s);
+   8          void numToStr(unsigned char idata* s, unsigned long c);
+   9          void DispInit();
+  10          void SysInit();
+  11          sbit led = P0 ^ 7;
+  12          
+  13          unsigned int cnt0 = 0;
+  14          unsigned char DispBuf[8];
+  15          unsigned char cnt0_lowl; 
+  16          unsigned char cnt0_lo = 0;
+  17          unsigned char cnt0_hi = 0;
+  18          unsigned char cnt0_overflow = 0;
+  19          
+  20          volatile bit flag;
+  21          
+  22          void T1INTSVC() interrupt 3 {
+  23   1          code unsigned char com[] = {0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80};
+  24   1          static unsigned char n = 0;
+  25   1          TR1 = 0;
+  26   1          TH1 = 0xFA;
+  27   1          TL1 = 0x27;
+  28   1          TR1 = 1;
+  29   1          XBYTE[0x7800] = 0xFF;
+  30   1          XBYTE[0x7801] = ~DispBuf[n];
+  31   1          XBYTE[0x7800] = ~com[n];
+  32   1          n++;
+  33   1          n &= 0x07;
+  34   1          flag = 1;
+  35   1      }
+  36          
+  37          
+  38          void T0INTSVC() interrupt 1 { cnt0++; }
+  39          
+  40          void DispClear() {
+  41   1          unsigned char i;
+  42   1          for (i = 0; i < 8; i++) {
+  43   2              DispBuf[i] = 0x00;
+  44   2          }
+  45   1      }
+  46          
+  47          void DispChar(unsigned char x, unsigned char c, bit dp) {
+  48   1          code unsigned char Tab[] = {0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07,
+  49   1                                      0x7F, 0x6F, 0x77, 0x7C, 0x39, 0x5E, 0x79, 0x71};
+  50   1          unsigned char t;
+  51   1          x &= 0x07;
+  52   1          x = 7 - x;
+  53   1          if (c == '-') {
+  54   2              t = 0x40;
+  55   2          } else {
+C51 COMPILER V8.02   MAIN                                                                  10/29/2025 22:05:14 PAGE 2   
+
+  56   2              t = toint(c);
+  57   2              if (t < 16) {
+  58   3                  t = Tab[t];
+  59   3              } else {
+  60   3                  t = 0x00;
+  61   3              }
+  62   2          }
+  63   1          if (dp) {
+  64   2              t |= 0x80;
+  65   2          } else {
+  66   2              t &= 0x7F;
+  67   2          }
+  68   1          DispBuf[x] = t;
+  69   1      }
+  70          
+  71          void DispStr(unsigned char x, unsigned char idata* s) {
+  72   1          unsigned char c;
+  73   1          for (;;) {
+  74   2              c = *s++;
+  75   2              if (c == '\0') break;
+  76   2              DispChar(x++, c, 0);
+  77   2          }
+  78   1      }
+  79          
+  80          
+  81          void numToStr(unsigned char idata* s, unsigned long c) {
+  82   1          code unsigned long Tab[] = {100000, 10000, 1000, 100, 10};
+  83   1          unsigned char i;
+  84   1          unsigned char t;
+  85   1          for (i = 0; i < 5; i++) {
+  86   2              t = c / Tab[i];
+  87   2              *s++ = '0' + t;
+  88   2              c -= t * Tab[i];
+  89   2          }
+  90   1          *s++ = '0' + c;
+  91   1          *s = '\0';
+  92   1      }
+  93          
+  94          void DispInit() {
+  95   1          DispClear();
+  96   1          EA = 0;
+  97   1          TMOD &= 0x0F;   /* T1 mode clear */
+  98   1          TMOD |= 0x10;   /* Timer1 mode1 */
+  99   1          TH1 = 0xFC;
+ 100   1          TL1 = 0x66;
+ 101   1          TR1 = 1;
+ 102   1          ET1 = 1;
+ 103   1          EA = 1;
+ 104   1      }
+ 105          
+ 106          void SysInit() {
+ 107   1          TMOD &= 0xF0;
+ 108   1      
+ 109   1          TMOD |= 0x05;
+ 110   1          TR0 = 0;
+ 111   1          ET0 = 1;
+ 112   1          DispInit();
+ 113   1      }
+ 114          
+ 115          void main() {
+ 116   1          unsigned int time = 0;
+ 117   1          unsigned char idata s[7];
+C51 COMPILER V8.02   MAIN                                                                  10/29/2025 22:05:14 PAGE 3   
+
+ 118   1          unsigned long frequency;
+ 119   1      
+ 120   1          SysInit();
+ 121   1      
+ 122   1      
+ 123   1          cnt0 = 0;
+ 124   1          TH0 = 0;
+ 125   1          TL0 = 0;
+ 126   1      
+ 127   1          for (;;) {
+ 128   2              flag = 0;
+ 129   2              while (!flag);
+ 130   2              time++;
+ 131   2      
+ 132   2      
+ 133   2              if (time == 100) {
+ 134   3       
+ 135   3                  cnt0 = 0;
+ 136   3                  TH0 = 0;
+ 137   3                  TL0 = 0;
+ 138   3                
+ 139   3                  TR0 = 1;
+ 140   3                  led = 0;
+ 141   3              }
+ 142   2      
+ 143   2              if (time == 1100) {
+ 144   3                  TR0 = 0;   
+ 145   3                  led = 1;
+ 146   3      
+ 147   3      
+ 148   3                  frequency = ((unsigned long)cnt0) * 65536
+ 149   3                              + ((unsigned long)TH0 << 8)
+ 150   3                              + (unsigned long)TL0;
+ 151   3      
+ 152   3                              if(frequency < 100000) frequency = frequency;
+ 153   3                              else if(frequency < 200000) frequency = frequency - 1;
+ 154   3                              else if(frequency < 300000) frequency = frequency - 3;
+ 155   3                              else if(frequency < 400000) frequency = frequency - 5;
+ 156   3                              else if(frequency < 500000) frequency = frequency - 7;
+ 157   3                              else if(frequency < 600000) frequency = frequency - 9;
+ 158   3                              else if(frequency < 700000) frequency = frequency - 10;
+ 159   3                              else frequency = frequency - 11;
+ 160   3      
+ 161   3      
+ 162   3                  numToStr(s, frequency);
+ 163   3                  DispStr(1, s);
+ 164   3      
+ 165   3      
+ 166   3                  DispBuf[4] |= 0x80;
+ 167   3      
+ 168   3      
+ 169   3                  cnt0 = 0;
+ 170   3                  TH0 = 0;
+ 171   3                  TL0 = 0;
+ 172   3                  time = 0;
+ 173   3              }
+ 174   2          }
+ 175   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    739    ----
+C51 COMPILER V8.02   MAIN                                                                  10/29/2025 22:05:14 PAGE 4   
+
+   CONSTANT SIZE    =     44    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     15      15
+   IDATA SIZE       =   ----       7
+   BIT SIZE         =      1       1
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
